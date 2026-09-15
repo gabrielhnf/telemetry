@@ -54,5 +54,8 @@ checksum:
         }
     }
 
+minimum frame size:
+    6 bytes
+
 maximum frame size:
     261 bytes
