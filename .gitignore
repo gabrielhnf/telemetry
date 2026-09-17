@@ -1,0 +1,16 @@
+build/
+
+*.exe
+*.out
+*.app
+
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+
+*.dSYM/
+*.pdb

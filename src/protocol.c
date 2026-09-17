@@ -4,78 +4,86 @@
 //sequence tracking
 //resynchronization
 
+#include "../include/protocol.h"
+#include <asm-generic/errno-base.h>
 #include <asm-generic/errno.h>
 #include <errno.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define MIN_PACKET_SIZE 6
-#define MAX_PACKET_SIZE 261
+int packet_encode_crc(struct packet *packet) {
+  uint8_t *buf = malloc(packet->len + 3);
+  if(!buf) return -1;
 
-uint16_t crc16arc(uint8_t *data, size_t len) {
-  uint16_t crc = 0;
-  uint16_t poly = 0xA001;
+  buf[0] = packet->len;
+  buf[1] = packet->seq;
+  buf[2] = packet->type;
+  memcpy(buf + 3, packet->payload, packet->len);
 
-  for(int i = 0; i < len; i++) {
-    crc ^= (uint16_t) data[i];
-
-    for(int bit = 0; bit < 8; bit++) {
-      if(crc & 1) {
-        crc = (crc >> 1) ^ poly;
-      } else {
-        crc = (crc >> 1);
-      }
-    }
-  }
-
-  return crc;
+  packet->crc = crc16arc(buf, packet->len + 3);
+  free(buf);
+  return 0;
 }
 
-struct packet {
-  uint8_t len;
-  uint8_t seq;
-  uint8_t type;
-  uint8_t *payload;
-  uint16_t crc;
-};
+//Should the packet own the payload? Or simply keep a reference to it? Do we care about this stuff in embedded programming?
+//Should we even try encapsulation? Is it important in embedded programming?
+struct packet *packet_create(uint8_t seq, uint8_t type, uint8_t *payload, uint8_t len) {
+  if(!payload) {
+    errno = EINVAL;
+    return NULL;
+  }
 
-//|SOF|payload_size|seq_number|packet_type|payload|checksum|
-//| 1 |     1      |    1     |     1     |   x   |   2    |
+  struct packet *packet = malloc(sizeof(struct packet));
+  if(!packet) return NULL;
 
-//TODO: Figure how to break this
+  packet->len = len;
+  packet->seq = seq;
+  packet->type = type;
+
+  uint8_t *payload_buf = malloc(len);
+  if(!payload_buf) {
+    free(packet);
+    return NULL;
+  }
+
+  memcpy(payload_buf, payload, len);
+  packet->payload = payload_buf;
+
+  if(packet_encode_crc(packet) == -1) {
+    free(packet->payload);
+    free(packet);
+    return NULL;
+  }
+
+  return packet;
+}
+
+void packet_free(struct packet *packet) {
+  free(packet->payload);
+  free(packet);
+}
+
 size_t packet_encode(struct packet *packet, uint8_t *buf, size_t buf_cap) {
-  if(buf_cap < MIN_PACKET_SIZE || buf_cap < packet->len + MIN_PACKET_SIZE) { //Design decision: what should be done when buffer is smaller than packet?
+  if(!buf) {
+    errno = EINVAL;
+    return 0;
+  }
+
+  if(buf_cap < (size_t)(packet->len + MIN_PACKET_SIZE)) {
     errno = ENOBUFS;
-    return 0; //return 0 and not emit packet? emit a malformed or incomplete packet?
-  }
-  buf[0] = 0x2b;
-  memcpy(buf + 1, packet, 3); //Is memcpy slower than raw assignments?
-  memcpy(buf + 4, packet->payload, packet->len); //Is memcpy slower than looping?
-
-  uint16_t crc = crc16arc(packet->payload, packet->len);
-  buf[4 + packet->len] = (uint8_t)(crc >> 8);
-  buf[5 + packet->len] = (uint8_t)(crc);
-
-  //What can go wrong?
-
-  return (6 + packet->len); //Isn't this too naive?
-
-}
-
-int main() {
-  uint8_t *buf = malloc(261);
-
-  char *payload = "123456789";
-  struct packet packet = {strlen(payload), 0, 0, (uint8_t *) payload, 0};
-
-  size_t res = packet_encode(&packet, buf, 261);
-
-  printf("%ld bytes written.\n", res);
-  for(int i = 0; i < res; i++) {
-    printf("%#04x ", buf[i]);
+    return 0;
   }
 
+  buf[0] = SOF;
+  buf[1] = packet->len;
+  buf[2] = packet->seq;
+  buf[3] = packet->type;
+  memcpy(buf + 4, packet->payload, packet->len);
+
+  buf[4 + packet->len] = (uint8_t)(packet->crc >> 8);
+  buf[5 + packet->len] = (uint8_t)(packet->crc);
+
+  return (6 + packet->len);
 }
