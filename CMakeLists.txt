@@ -11,12 +11,12 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 #  target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include)
 #endforeach()
 
-add_executable(test_protocol 
-  test/test_protocol.c 
+add_executable(test_packet 
+  test/test_packet.c 
   test/unity/unity.c 
-  src/protocol.c
+  src/packet.c
   src/crc.c
 )
 
-target_include_directories(test_protocol PRIVATE include test/unity)
-#target_compile_options(test_protocol PRIVATE -Wall -Wextra -Wpedantic -Wconversion -fsanitize=address,undefined)
+target_include_directories(test_packet PRIVATE include test/unity)
+#target_compile_options(test_packet PRIVATE -Wall -Wextra -Wpedantic -Wconversion -fsanitize=address,undefined)

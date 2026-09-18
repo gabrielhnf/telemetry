@@ -1,5 +1,5 @@
 #include "unity/unity.h"
-#include "../include/protocol.h"
+#include "../include/packet.h"
 #include "unity/unity_internals.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -186,6 +186,27 @@ void test_packet_encode_sequence_255(void) {
   TEST_ASSERT_EQUAL_size_t(packet_size, bytes);
 }
 
+void test_packet_decode(void) {
+  uint8_t buffer[] = { 0x2B, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0x54, 0x78 };
+
+  uint8_t payload[] = { 0xFF, 0xFF };
+
+  size_t payload_size = sizeof(payload)/sizeof(uint8_t);
+  size_t packet_size = MIN_PACKET_SIZE + payload_size;
+
+  struct packet expected = {
+    .len = payload_size, 
+    .seq = DUMMY_VALUE, 
+    .type = DUMMY_VALUE, 
+    .payload = payload, 
+    .crc = DUMMY_VALUE
+  };
+  packet_encode_crc(&expected);
+
+  struct packet *actual = packet_decode(buffer, sizeof(buffer)/sizeof(uint8_t));
+  TEST_ASSERT_EQUAL_INT(1, packet_cmp(actual, &expected));
+}
+
 int main(void) {
   UNITY_BEGIN();
 
@@ -195,6 +216,7 @@ int main(void) {
   RUN_TEST(test_packet_encode_payload_containing_sof);
   RUN_TEST(test_packet_encode_sequence_zero);
   RUN_TEST(test_packet_encode_sequence_255);
+  RUN_TEST(test_packet_decode);
 
   return UNITY_END();
 }

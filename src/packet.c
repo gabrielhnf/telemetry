@@ -1,10 +1,7 @@
-//encode packets
-//decode packets
-//CRC
-//sequence tracking
-//resynchronization
+//encode packets ✅
+//CRC ✅
 
-#include "../include/protocol.h"
+#include "../include/packet.h"
 #include <asm-generic/errno-base.h>
 #include <asm-generic/errno.h>
 #include <errno.h>
@@ -65,13 +62,13 @@ void packet_free(struct packet *packet) {
   free(packet);
 }
 
-size_t packet_encode(struct packet *packet, uint8_t *buf, size_t buf_cap) {
+size_t packet_encode(struct packet *packet, uint8_t *buf, size_t buf_len) {
   if(!buf) {
     errno = EINVAL;
     return 0;
   }
 
-  if(buf_cap < (size_t)(packet->len + MIN_PACKET_SIZE)) {
+  if(buf_len < (size_t)(packet->len + MIN_PACKET_SIZE)) {
     errno = ENOBUFS;
     return 0;
   }
@@ -86,4 +83,52 @@ size_t packet_encode(struct packet *packet, uint8_t *buf, size_t buf_cap) {
   buf[5 + packet->len] = (uint8_t)(packet->crc);
 
   return (6 + packet->len);
+}
+
+//Should return a reference to a packet or the packet itself?
+//Should we try a consumer pattern? (consume_sof(), consume_header(), etc)
+struct packet *packet_decode(uint8_t *buf, size_t buf_len) { 
+  struct packet *packet = malloc(sizeof(struct packet));
+  if(!packet) return NULL;
+
+  for(size_t i = 0; i < buf_len; i++) {
+    uint8_t byte = buf[i];
+
+    if(byte == SOF) {
+      i++; //consumes SOF
+      //seems a bit dangerous
+      uint8_t len = buf[i++];
+      uint8_t seq = buf[i++];
+      uint8_t type = buf[i++];
+      uint8_t *payload_buf = malloc(len); //can fail
+      size_t start_index = i;
+      for(; i - start_index < len; i++) //does this work?
+        payload_buf[i - start_index] = buf[i];
+      uint16_t crc = (buf[i++] << 8);
+      crc ^= buf[i];
+
+      packet->len = len;
+      packet->seq = seq;
+      packet->type = type;
+      packet->payload = payload_buf;
+      packet->crc = crc;
+
+      return packet;
+
+    }
+
+  }
+  return NULL;
+}
+
+int packet_cmp(struct packet *lhs, struct packet *rhs) {
+  int res = 1;
+  res &= lhs->len == rhs->len;
+  res &= lhs->seq == rhs->seq;
+  res &= lhs->type == rhs->type;
+  for(int i = 0; i < lhs->len; i++) {
+    res &= lhs->payload[i] == rhs->payload[i];
+  }
+  res &= lhs->crc == rhs->crc;
+  return res;
 }
