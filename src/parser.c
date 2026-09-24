@@ -2,26 +2,9 @@
 //sequence tracking
 //resynchronization
 
-#include <stdint.h>
-#include <stddef.h>
+#include "../include/parser.h"
 #include "../include/packet.h"
-
-enum parser_state {
-  SEARCH_SOF,
-  READ_HEADER,
-  READ_PAYLOAD,
-  READ_CRC,
-};
-
-typedef void (*packet_callback)(struct packet *packet);
-
-struct parser {
-  enum parser_state state;
-  packet_callback callback;
-
-  uint8_t frame_buf[261];
-  size_t frame_len;
-};
+#include <stdio.h>
 
 void parser_init(struct parser *parser, packet_callback callback) {
   parser->state = SEARCH_SOF;
@@ -41,25 +24,26 @@ void parser_consume_byte(struct parser *parser, uint8_t byte) {
 
     case READ_HEADER:
       parser->frame_buf[parser->frame_len++] = byte;
-      if(parser->frame_len > SOF_SIZE + PACKET_HEADER_SIZE) parser->state = READ_PAYLOAD;
+      if(parser->frame_len >= SOF_SIZE + PACKET_HEADER_SIZE) parser->state = READ_PAYLOAD;
       break;
 
     case READ_PAYLOAD:
+      parser->frame_buf[parser->frame_len++] = byte;
       if(parser->frame_len - (PACKET_HEADER_SIZE + SOF_SIZE) < parser->frame_buf[1])
-        parser->frame_buf[parser->frame_len++] = byte;
-      else parser->state = READ_CRC;
+        parser->state = READ_CRC;
       break;
 
     case READ_CRC:
-      if(parser->frame_len < parser->frame_buf[1] + PACKET_HEADER_SIZE + SOF_SIZE + PACKET_CRC_SIZE)
-        parser->frame_buf[parser->frame_len++] = byte;
-      else {
-        //decode packet
-        //call callback
-        parser->callback(NULL); 
-        //should the callback return crc validation?
-        //or perform it here?
-        //in any case, in the event of invalid CRC, perform resynchronization
+      parser->frame_buf[parser->frame_len++] = byte;
+      if(parser->frame_len >= parser->frame_buf[1] + MIN_PACKET_SIZE) {
+        printf("Parser buffer: ");
+        for(int i = 0; i < parser->frame_len; i++) {
+          printf("0x%02X ", parser->frame_buf[i]);
+        }
+        printf("\n");
+        struct packet *p = packet_decode(parser->frame_buf, parser->frame_len);
+        parser->callback(p); 
+        //crc validation occurs here, returns if need resync (dropped packet) or not
         parser->state = SEARCH_SOF;
       }
       break;

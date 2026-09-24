@@ -18,5 +18,15 @@ add_executable(test_packet
   src/crc.c
 )
 
+add_executable(test_parser
+  test/test_parser.c
+  test/unity/unity.c 
+  src/parser.c
+  src/packet.c
+  src/crc.c
+)
+
 target_include_directories(test_packet PRIVATE include test/unity)
+target_include_directories(test_parser PRIVATE include test/unity)
+target_compile_options(test_parser PRIVATE -g)
 #target_compile_options(test_packet PRIVATE -Wall -Wextra -Wpedantic -Wconversion -fsanitize=address,undefined)
