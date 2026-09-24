@@ -6,8 +6,11 @@
 #include "../include/crc.h"
 
 #define SOF 0x2b
+#define SOF_SIZE 1
 #define MIN_PACKET_SIZE 6
 #define MAX_PACKET_SIZE 261
+#define PACKET_HEADER_SIZE 3
+#define PACKET_CRC_SIZE 2
 
 
 struct packet {
