@@ -26,5 +26,7 @@ size_t packet_encode(struct packet *packet, uint8_t *buf, size_t buf_cap);
 int packet_encode_crc(struct packet *packet);
 struct packet *packet_decode(uint8_t *buf, size_t buf_len);
 int packet_cmp(struct packet *lhs, struct packet *rhs);
+int packet_validate(struct packet *packet);
+void packet_free(struct packet *packet);
 
 #endif // !PROTOCOL_H

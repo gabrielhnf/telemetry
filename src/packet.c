@@ -17,7 +17,7 @@ int packet_encode_crc(struct packet *packet) {
   buf[0] = packet->len;
   buf[1] = packet->seq;
   buf[2] = packet->type;
-  memcpy(buf + 3, packet->payload, packet->len);
+  if(packet->payload) memcpy(buf + 3, packet->payload, packet->len);
 
   packet->crc = crc16arc(buf, packet->len + 3);
   free(buf);
@@ -77,12 +77,12 @@ size_t packet_encode(struct packet *packet, uint8_t *buf, size_t buf_len) {
   buf[1] = packet->len;
   buf[2] = packet->seq;
   buf[3] = packet->type;
-  memcpy(buf + 4, packet->payload, packet->len);
+  if(packet->payload) memcpy(buf + 4, packet->payload, packet->len);
 
   buf[4 + packet->len] = (uint8_t)(packet->crc >> 8);
   buf[5 + packet->len] = (uint8_t)(packet->crc);
 
-  return (6 + packet->len);
+  return (MIN_PACKET_SIZE + packet->len);
 }
 
 //Should return a reference to a packet or the packet itself?
@@ -131,4 +131,17 @@ int packet_cmp(struct packet *lhs, struct packet *rhs) {
   }
   res &= lhs->crc == rhs->crc;
   return res;
+}
+
+int packet_validate(struct packet *packet) {
+  size_t buf_size = packet->len + MIN_PACKET_SIZE;
+  uint8_t *buf = malloc(buf_size);
+  if(!buf) return -1;
+  packet_encode(packet, buf, buf_size);
+
+  uint16_t res = crc16arc(buf + 1, buf_size - 3); //Packet size minus SOF and CRC
+  free(buf);
+
+  if(packet->crc != res) return -1;
+  return 0;
 }

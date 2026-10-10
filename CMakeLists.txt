@@ -28,5 +28,15 @@ add_executable(test_parser
 
 target_include_directories(test_packet PRIVATE include test/unity)
 target_include_directories(test_parser PRIVATE include test/unity)
+
 target_compile_options(test_parser PRIVATE -g)
+target_compile_options(test_packet PRIVATE -g)
+
+target_compile_options(test_parser PRIVATE -fsanitize=address,undefined)
+target_compile_options(test_packet PRIVATE -fsanitize=address,undefined)
+
+target_link_options(test_parser PRIVATE -fsanitize=address,undefined)
+target_link_options(test_packet PRIVATE -fsanitize=address,undefined)
+
+
 #target_compile_options(test_packet PRIVATE -Wall -Wextra -Wpedantic -Wconversion -fsanitize=address,undefined)

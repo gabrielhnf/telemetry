@@ -15,10 +15,11 @@ struct parser {
   enum parser_state state;
   packet_callback callback;
 
-  uint8_t frame_buf[261];
+  uint8_t frame_buf[MAX_PACKET_SIZE];
   size_t frame_len;
 };
 
 void parser_init(struct parser *parser, packet_callback callback);
 void parser_consume_byte(struct parser *parser, uint8_t byte);
 void parser_feed(struct parser *parser, uint8_t *data, size_t len);
+void parser_resync(struct parser *parser);

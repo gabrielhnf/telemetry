@@ -1,210 +1,523 @@
 #include "unity/unity.h"
 #include "../include/packet.h"
-#include "unity/unity_internals.h"
+
 #include <stdint.h>
-#include <stdio.h>
+#include <stddef.h>
+#include <stdlib.h>
 
-#define DUMMY_VALUE 255
+static void free_decoded_packet(struct packet *packet) {
+  if(packet == NULL) {
+    return;
+  }
 
-void setUp(void) {}
-void tearDown(void) {}
+  free(packet->payload);
+  free(packet);
+}
+
+void setUp(void) {
+}
+
+void tearDown(void) {
+}
 
 void test_packet_encode_empty_payload(void) {
-  uint8_t expected[] = { 0x2B, 0x00, 0xFF, 0xFF, 0xB0, 0x01 };
+  uint8_t expected[] = {
+    0x2B,
+    0x00,
+    0xFF,
+    0xFF,
+    0xB0,
+    0x01
+  };
+
   uint8_t actual[MAX_PACKET_SIZE];
 
-  uint8_t payload[] = {};
-
-  size_t payload_size = sizeof(payload)/sizeof(uint8_t);
-  size_t packet_size = MIN_PACKET_SIZE + payload_size;
-
   struct packet packet = {
-    .len = 0, 
-    .seq = DUMMY_VALUE, 
-    .type = DUMMY_VALUE, 
-    .payload = payload, 
-    .crc = DUMMY_VALUE
+    .len = 0,
+    .seq = 0xFF,
+    .type = 0xFF,
+    .payload = NULL,
+    .crc = 0
   };
 
   packet_encode_crc(&packet);
-  size_t bytes = packet_encode(&packet, actual, MAX_PACKET_SIZE);
 
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, actual, packet_size);
+  size_t bytes = packet_encode(
+      &packet,
+      actual,
+      sizeof(actual));
+
   TEST_ASSERT_EQUAL_size_t(MIN_PACKET_SIZE, bytes);
+
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(
+      expected,
+      actual,
+      sizeof(expected));
 }
 
 void test_packet_encode_one_byte_payload(void) {
-  uint8_t expected[] = { 0x2B, 0x01, 0xFF, 0xFF, 0x01, 0xFC, 0xB1 };
+  uint8_t expected[] = {
+    0x2B,
+    0x01,
+    0xFF,
+    0xFF,
+    0x01,
+    0xFC,
+    0xB1
+  };
+
+  uint8_t payload[] = {
+    0x01
+  };
+
   uint8_t actual[MAX_PACKET_SIZE];
 
-  uint8_t payload[] = { 0x01 };
-
-  size_t payload_size = sizeof(payload)/sizeof(uint8_t);
-  size_t packet_size = MIN_PACKET_SIZE + payload_size;
-
   struct packet packet = {
-    .len = 1, 
-    .seq = DUMMY_VALUE, 
-    .type = DUMMY_VALUE, 
-    .payload = payload, 
-    .crc = DUMMY_VALUE
+    .len = sizeof(payload),
+    .seq = 0xFF,
+    .type = 0xFF,
+    .payload = payload,
+    .crc = 0
   };
 
   packet_encode_crc(&packet);
-  size_t bytes = packet_encode(&packet, actual, MAX_PACKET_SIZE);
 
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, actual, packet_size);
-  TEST_ASSERT_EQUAL_size_t(packet_size, bytes);
-}
+  size_t bytes = packet_encode(
+      &packet,
+      actual,
+      sizeof(actual));
 
-void test_packet_encode_max_payload(void) {
-  uint8_t expected[] = { 
-    0x2B, 0xFF, 0xFF, 0xFF, 
-    0x4F, 0x6E, 0x65, 0x20, 0x6D, 0x6F, 0x72, 0x6E, 0x69, 0x6E, 0x67, 0x2C, 0x20, 0x77, 0x68, 0x65, 0x6E, 
-    0x20, 0x47, 0x72, 0x65, 0x67, 0x6F, 0x72, 0x20, 0x53, 0x61, 0x6D, 0x73, 0x61, 0x20, 0x77, 0x6F, 0x6B, 
-    0x65, 0x20, 0x66, 0x72, 0x6F, 0x6D, 0x20, 0x74, 0x72, 0x6F, 0x75, 0x62, 0x6C, 0x65, 0x64, 0x20, 0x64, 
-    0x72, 0x65, 0x61, 0x6D, 0x73, 0x2C, 0x20, 0x68, 0x65, 0x20, 0x66, 0x6F, 0x75, 0x6E, 0x64, 0x20, 0x68, 
-    0x69, 0x6D, 0x73, 0x65, 0x6C, 0x66, 0x20, 0x74, 0x72, 0x61, 0x6E, 0x73, 0x66, 0x6F, 0x72, 0x6D, 0x65, 
-    0x64, 0x20, 0x69, 0x6E, 0x20, 0x68, 0x69, 0x73, 0x20, 0x62, 0x65, 0x64, 0x20, 0x69, 0x6E, 0x74, 0x6F, 
-    0x20, 0x61, 0x20, 0x68, 0x6F, 0x72, 0x72, 0x69, 0x62, 0x6C, 0x65, 0x20, 0x76, 0x65, 0x72, 0x6D, 0x69, 
-    0x6E, 0x2E, 0x20, 0x48, 0x65, 0x20, 0x6C, 0x61, 0x79, 0x20, 0x6F, 0x6E, 0x20, 0x68, 0x69, 0x73, 0x20, 
-    0x61, 0x72, 0x6D, 0x6F, 0x75, 0x72, 0x2D, 0x6C, 0x69, 0x6B, 0x65, 0x20, 0x62, 0x61, 0x63, 0x6B, 0x2C, 
-    0x20, 0x61, 0x6E, 0x64, 0x20, 0x69, 0x66, 0x20, 0x68, 0x65, 0x20, 0x6C, 0x69, 0x66, 0x74, 0x65, 0x64, 
-    0x20, 0x68, 0x69, 0x73, 0x20, 0x68, 0x65, 0x61, 0x64, 0x20, 0x61, 0x20, 0x6C, 0x69, 0x74, 0x74, 0x6C, 
-    0x65, 0x20, 0x68, 0x65, 0x20, 0x63, 0x6F, 0x75, 0x6C, 0x64, 0x20, 0x73, 0x65, 0x65, 0x20, 0x68, 0x69, 
-    0x73, 0x20, 0x62, 0x72, 0x6F, 0x77, 0x6E, 0x20, 0x62, 0x65, 0x6C, 0x6C, 0x79, 0x2C, 0x20, 0x73, 0x6C, 
-    0x69, 0x67, 0x68, 0x74, 0x6C, 0x79, 0x20, 0x64, 0x6F, 0x6D, 0x65, 0x64, 0x20, 0x61, 0x6E, 0x64, 0x20, 
-    0x64, 0x69, 0x76, 0x69, 0x64, 0x65, 0x64, 0x20, 0x62, 0x79, 0x20, 0x61, 0x72, 0x63, 0x68, 0x65, 0x73, 
-    0x87, 0x70 
-  };
-  uint8_t actual[MAX_PACKET_SIZE];
+  TEST_ASSERT_EQUAL_size_t(sizeof(expected), bytes);
 
-  uint8_t payload[] = { 
-    0x4F, 0x6E, 0x65, 0x20, 0x6D, 0x6F, 0x72, 0x6E, 0x69, 0x6E, 0x67, 0x2C, 0x20, 0x77, 0x68, 0x65, 0x6E, 
-    0x20, 0x47, 0x72, 0x65, 0x67, 0x6F, 0x72, 0x20, 0x53, 0x61, 0x6D, 0x73, 0x61, 0x20, 0x77, 0x6F, 0x6B, 
-    0x65, 0x20, 0x66, 0x72, 0x6F, 0x6D, 0x20, 0x74, 0x72, 0x6F, 0x75, 0x62, 0x6C, 0x65, 0x64, 0x20, 0x64, 
-    0x72, 0x65, 0x61, 0x6D, 0x73, 0x2C, 0x20, 0x68, 0x65, 0x20, 0x66, 0x6F, 0x75, 0x6E, 0x64, 0x20, 0x68, 
-    0x69, 0x6D, 0x73, 0x65, 0x6C, 0x66, 0x20, 0x74, 0x72, 0x61, 0x6E, 0x73, 0x66, 0x6F, 0x72, 0x6D, 0x65, 
-    0x64, 0x20, 0x69, 0x6E, 0x20, 0x68, 0x69, 0x73, 0x20, 0x62, 0x65, 0x64, 0x20, 0x69, 0x6E, 0x74, 0x6F, 
-    0x20, 0x61, 0x20, 0x68, 0x6F, 0x72, 0x72, 0x69, 0x62, 0x6C, 0x65, 0x20, 0x76, 0x65, 0x72, 0x6D, 0x69, 
-    0x6E, 0x2E, 0x20, 0x48, 0x65, 0x20, 0x6C, 0x61, 0x79, 0x20, 0x6F, 0x6E, 0x20, 0x68, 0x69, 0x73, 0x20, 
-    0x61, 0x72, 0x6D, 0x6F, 0x75, 0x72, 0x2D, 0x6C, 0x69, 0x6B, 0x65, 0x20, 0x62, 0x61, 0x63, 0x6B, 0x2C, 
-    0x20, 0x61, 0x6E, 0x64, 0x20, 0x69, 0x66, 0x20, 0x68, 0x65, 0x20, 0x6C, 0x69, 0x66, 0x74, 0x65, 0x64, 
-    0x20, 0x68, 0x69, 0x73, 0x20, 0x68, 0x65, 0x61, 0x64, 0x20, 0x61, 0x20, 0x6C, 0x69, 0x74, 0x74, 0x6C, 
-    0x65, 0x20, 0x68, 0x65, 0x20, 0x63, 0x6F, 0x75, 0x6C, 0x64, 0x20, 0x73, 0x65, 0x65, 0x20, 0x68, 0x69, 
-    0x73, 0x20, 0x62, 0x72, 0x6F, 0x77, 0x6E, 0x20, 0x62, 0x65, 0x6C, 0x6C, 0x79, 0x2C, 0x20, 0x73, 0x6C, 
-    0x69, 0x67, 0x68, 0x74, 0x6C, 0x79, 0x20, 0x64, 0x6F, 0x6D, 0x65, 0x64, 0x20, 0x61, 0x6E, 0x64, 0x20, 
-    0x64, 0x69, 0x76, 0x69, 0x64, 0x65, 0x64, 0x20, 0x62, 0x79, 0x20, 0x61, 0x72, 0x63, 0x68, 0x65, 0x73 
-  };
-
-  size_t payload_size = sizeof(payload)/sizeof(uint8_t);
-  size_t packet_size = MIN_PACKET_SIZE + payload_size;
-
-  struct packet packet = {
-    .len = 255, 
-    .seq = DUMMY_VALUE, 
-    .type = DUMMY_VALUE, 
-    .payload = payload, 
-    .crc = DUMMY_VALUE
-  };
-
-  packet_encode_crc(&packet);
-  size_t bytes = packet_encode(&packet, actual, MAX_PACKET_SIZE);
-
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, actual, packet_size);
-  TEST_ASSERT_EQUAL_size_t(MAX_PACKET_SIZE, bytes);
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(
+      expected,
+      actual,
+      sizeof(expected));
 }
 
 void test_packet_encode_payload_containing_sof(void) {
-  uint8_t expected[] = { 0x2B, 0x0B, 0xFF, 0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x2B, 0x06, 0x07, 0x08, 0x09, 0x0A, 0xEF, 0x64 };
+  uint8_t expected[] = {
+    0x2B,
+    0x0B,
+    0xFF,
+    0xFF,
+    0x01,
+    0x02,
+    0x03,
+    0x04,
+    0x05,
+    0x2B,
+    0x06,
+    0x07,
+    0x08,
+    0x09,
+    0x0A,
+    0xEF,
+    0x64
+  };
+
+  uint8_t payload[] = {
+    0x01,
+    0x02,
+    0x03,
+    0x04,
+    0x05,
+    0x2B,
+    0x06,
+    0x07,
+    0x08,
+    0x09,
+    0x0A
+  };
+
   uint8_t actual[MAX_PACKET_SIZE];
 
-  uint8_t payload[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x2B, 0x06, 0x07, 0x08, 0x09, 0x0A };
-
-  size_t payload_size = sizeof(payload)/sizeof(uint8_t);
-  size_t packet_size = MIN_PACKET_SIZE + payload_size;
-
   struct packet packet = {
-    .len = payload_size, 
-    .seq = DUMMY_VALUE, 
-    .type = DUMMY_VALUE, 
-    .payload = payload, 
-    .crc = DUMMY_VALUE
+    .len = sizeof(payload),
+    .seq = 0xFF,
+    .type = 0xFF,
+    .payload = payload,
+    .crc = 0
   };
-  packet_encode_crc(&packet);
-  size_t bytes = packet_encode(&packet, actual, MAX_PACKET_SIZE);
 
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, actual, packet_size);
-  TEST_ASSERT_EQUAL_size_t(packet_size, bytes);
+  packet_encode_crc(&packet);
+
+  size_t bytes = packet_encode(
+      &packet,
+      actual,
+      sizeof(actual));
+
+  TEST_ASSERT_EQUAL_size_t(sizeof(expected), bytes);
+
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(
+      expected,
+      actual,
+      sizeof(expected));
 }
 
 void test_packet_encode_sequence_zero(void) {
-  uint8_t expected[] = { 0x2B, 0x0B, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x09 };
+  uint8_t expected[] = {
+    0x2B,
+    0x01,
+    0x00,
+    0x7E,
+    0x01,
+    0x9C,
+    0xE1
+  };
+
+  uint8_t payload[] = {
+    0x01
+  };
+
   uint8_t actual[MAX_PACKET_SIZE];
 
-  uint8_t payload[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-
-  size_t payload_size = sizeof(payload)/sizeof(uint8_t);
-  size_t packet_size = MIN_PACKET_SIZE + payload_size;
-
   struct packet packet = {
-    .len = payload_size, 
-    .seq = DUMMY_VALUE, 
-    .type = DUMMY_VALUE, 
-    .payload = payload, 
-    .crc = DUMMY_VALUE
+    .len = sizeof(payload),
+    .seq = 0x00,
+    .type = 0x7E,
+    .payload = payload,
+    .crc = 0
   };
 
   packet_encode_crc(&packet);
-  size_t bytes = packet_encode(&packet, actual, MAX_PACKET_SIZE);
 
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, actual, packet_size);
-  TEST_ASSERT_EQUAL_size_t(packet_size, bytes);
+  size_t bytes = packet_encode(
+      &packet,
+      actual,
+      sizeof(actual));
+
+  TEST_ASSERT_EQUAL_size_t(sizeof(expected), bytes);
+
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(
+      expected,
+      actual,
+      sizeof(expected));
 }
 
 void test_packet_encode_sequence_255(void) {
-  uint8_t expected[] = { 0x2B, 0x0B, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xB4, 0x0B };
+  uint8_t expected[] = {
+    0x2B,
+    0x01,
+    0xFF,
+    0x7E,
+    0x01,
+    0xAC,
+    0xD1
+  };
+
+  uint8_t payload[] = {
+    0x01
+  };
+
   uint8_t actual[MAX_PACKET_SIZE];
 
-  uint8_t payload[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-
-  size_t payload_size = sizeof(payload)/sizeof(uint8_t);
-  size_t packet_size = MIN_PACKET_SIZE + payload_size;
-
   struct packet packet = {
-    .len = payload_size, 
-    .seq = DUMMY_VALUE, 
-    .type = DUMMY_VALUE, 
-    .payload = payload, 
-    .crc = DUMMY_VALUE
+    .len = sizeof(payload),
+    .seq = 0xFF,
+    .type = 0x7E,
+    .payload = payload,
+    .crc = 0
   };
 
   packet_encode_crc(&packet);
-  size_t bytes = packet_encode(&packet, actual, MAX_PACKET_SIZE);
 
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, actual, packet_size);
-  TEST_ASSERT_EQUAL_size_t(packet_size, bytes);
+  size_t bytes = packet_encode(
+      &packet,
+      actual,
+      sizeof(actual));
+
+  TEST_ASSERT_EQUAL_size_t(sizeof(expected), bytes);
+
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(
+      expected,
+      actual,
+      sizeof(expected));
 }
 
-void test_packet_decode(void) {
-  uint8_t buffer[] = { 0x2B, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0x54, 0x78 };
-
-  uint8_t payload[] = { 0xFF, 0xFF };
-
-  size_t payload_size = sizeof(payload)/sizeof(uint8_t);
-  size_t packet_size = MIN_PACKET_SIZE + payload_size;
-
-  struct packet expected = {
-    .len = payload_size, 
-    .seq = DUMMY_VALUE, 
-    .type = DUMMY_VALUE, 
-    .payload = payload, 
-    .crc = DUMMY_VALUE
+void test_packet_encode_type_zero(void) {
+  uint8_t expected[] = {
+    0x2B,
+    0x01,
+    0x42,
+    0x00,
+    0x01,
+    0x28,
+    0x60
   };
-  packet_encode_crc(&expected);
 
-  struct packet *actual = packet_decode(buffer, sizeof(buffer)/sizeof(uint8_t));
-  TEST_ASSERT_EQUAL_INT(1, packet_cmp(actual, &expected));
+  uint8_t payload[] = {
+    0x01
+  };
+
+  uint8_t actual[MAX_PACKET_SIZE];
+
+  struct packet packet = {
+    .len = sizeof(payload),
+    .seq = 0x42,
+    .type = 0x00,
+    .payload = payload,
+    .crc = 0
+  };
+
+  packet_encode_crc(&packet);
+
+  size_t bytes = packet_encode(
+      &packet,
+      actual,
+      sizeof(actual));
+
+  TEST_ASSERT_EQUAL_size_t(sizeof(expected), bytes);
+
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(
+      expected,
+      actual,
+      sizeof(expected));
+}
+
+void test_packet_encode_type_255(void) {
+  uint8_t expected[] = {
+    0x2B,
+    0x01,
+    0x42,
+    0xFF,
+    0x01,
+    0xD8,
+    0x21
+  };
+
+  uint8_t payload[] = {
+    0x01
+  };
+
+  uint8_t actual[MAX_PACKET_SIZE];
+
+  struct packet packet = {
+    .len = sizeof(payload),
+    .seq = 0x42,
+    .type = 0xFF,
+    .payload = payload,
+    .crc = 0
+  };
+
+  packet_encode_crc(&packet);
+
+  size_t bytes = packet_encode(
+      &packet,
+      actual,
+      sizeof(actual));
+
+  TEST_ASSERT_EQUAL_size_t(sizeof(expected), bytes);
+
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(
+      expected,
+      actual,
+      sizeof(expected));
+}
+
+void test_packet_encode_maximum_payload(void) {
+  uint8_t payload[255];
+  uint8_t actual[MAX_PACKET_SIZE];
+
+  for(size_t i = 0; i < sizeof(payload); i++) {
+    payload[i] = (uint8_t)i;
+  }
+
+  struct packet packet = {
+    .len = 255,
+    .seq = 0x12,
+    .type = 0x34,
+    .payload = payload,
+    .crc = 0
+  };
+
+  packet_encode_crc(&packet);
+
+  size_t bytes = packet_encode(
+      &packet,
+      actual,
+      sizeof(actual));
+
+  TEST_ASSERT_EQUAL_size_t(MAX_PACKET_SIZE, bytes);
+
+  TEST_ASSERT_EQUAL_HEX8(0x2B, actual[0]);
+  TEST_ASSERT_EQUAL_HEX8(0xFF, actual[1]);
+  TEST_ASSERT_EQUAL_HEX8(0x12, actual[2]);
+  TEST_ASSERT_EQUAL_HEX8(0x34, actual[3]);
+
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(
+      payload,
+      &actual[4],
+      sizeof(payload));
+
+  /*
+   * Your protocol currently writes the high CRC byte first.
+   */
+  TEST_ASSERT_EQUAL_HEX8(
+      (uint8_t)((packet.crc >> 8) & 0xFF),
+      actual[MAX_PACKET_SIZE - 2]);
+
+  TEST_ASSERT_EQUAL_HEX8(
+      (uint8_t)(packet.crc & 0xFF),
+      actual[MAX_PACKET_SIZE - 1]);
+}
+
+void test_packet_decode_known_packet(void) {
+  uint8_t frame[] = {
+    0x2B,
+    0x02,
+    0xFF,
+    0xFF,
+    0xFF,
+    0xFF,
+    0x54,
+    0x78
+  };
+
+  struct packet *packet = packet_decode(
+      frame,
+      sizeof(frame));
+
+  TEST_ASSERT_NOT_NULL(packet);
+
+  TEST_ASSERT_EQUAL_UINT8(2, packet->len);
+  TEST_ASSERT_EQUAL_HEX8(0xFF, packet->seq);
+  TEST_ASSERT_EQUAL_HEX8(0xFF, packet->type);
+
+  TEST_ASSERT_NOT_NULL(packet->payload);
+  TEST_ASSERT_EQUAL_HEX8(0xFF, packet->payload[0]);
+  TEST_ASSERT_EQUAL_HEX8(0xFF, packet->payload[1]);
+
+  TEST_ASSERT_EQUAL_HEX16(0x5478, packet->crc);
+
+  free_decoded_packet(packet);
+}
+
+void test_packet_decode_zero_length_payload(void) {
+  uint8_t frame[] = {
+    0x2B,
+    0x00,
+    0xFF,
+    0xFF,
+    0xB0,
+    0x01
+  };
+
+  struct packet *packet = packet_decode(
+      frame,
+      sizeof(frame));
+
+  TEST_ASSERT_NOT_NULL(packet);
+
+  TEST_ASSERT_EQUAL_UINT8(0, packet->len);
+  TEST_ASSERT_EQUAL_HEX8(0xFF, packet->seq);
+  TEST_ASSERT_EQUAL_HEX8(0xFF, packet->type);
+  TEST_ASSERT_EQUAL_HEX16(0xB001, packet->crc);
+
+  free_decoded_packet(packet);
+}
+
+void test_packet_validate_accepts_valid_packet(void) {
+  uint8_t payload[] = {
+    0xFF,
+    0xFF
+  };
+
+  struct packet packet = {
+    .len = 2,
+    .seq = 0xFF,
+    .type = 0xFF,
+    .payload = payload,
+    .crc = 0x5478
+  };
+
+  TEST_ASSERT_NOT_EQUAL(
+      -1,
+      packet_validate(&packet));
+}
+
+void test_packet_validate_rejects_corrupted_payload(void) {
+  uint8_t payload[] = {
+    0xFF,
+    0xFF
+  };
+
+  struct packet packet = {
+    .len = 2,
+    .seq = 0xFF,
+    .type = 0xFF,
+    .payload = payload,
+    .crc = 0x5478
+  };
+
+  payload[0] ^= 0x01;
+
+  TEST_ASSERT_EQUAL_INT(
+      -1,
+      packet_validate(&packet));
+}
+
+void test_packet_validate_rejects_corrupted_sequence(void) {
+  uint8_t payload[] = {
+    0xFF,
+    0xFF
+  };
+
+  struct packet packet = {
+    .len = 2,
+    .seq = 0xFF,
+    .type = 0xFF,
+    .payload = payload,
+    .crc = 0x5478
+  };
+
+  packet.seq ^= 0x01;
+
+  TEST_ASSERT_EQUAL_INT(
+      -1,
+      packet_validate(&packet));
+}
+
+void test_packet_validate_rejects_corrupted_type(void) {
+  uint8_t payload[] = {
+    0xFF,
+    0xFF
+  };
+
+  struct packet packet = {
+    .len = 2,
+    .seq = 0xFF,
+    .type = 0xFF,
+    .payload = payload,
+    .crc = 0x5478
+  };
+
+  packet.type ^= 0x01;
+
+  TEST_ASSERT_EQUAL_INT(
+      -1,
+      packet_validate(&packet));
+}
+
+void test_packet_validate_rejects_corrupted_crc(void) {
+  uint8_t payload[] = {
+    0xFF,
+    0xFF
+  };
+
+  struct packet packet = {
+    .len = 2,
+    .seq = 0xFF,
+    .type = 0xFF,
+    .payload = payload,
+    .crc = 0x5478
+  };
+
+  packet.crc ^= 0x0001;
+
+  TEST_ASSERT_EQUAL_INT(
+      -1,
+      packet_validate(&packet));
 }
 
 int main(void) {
@@ -212,11 +525,21 @@ int main(void) {
 
   RUN_TEST(test_packet_encode_empty_payload);
   RUN_TEST(test_packet_encode_one_byte_payload);
-  RUN_TEST(test_packet_encode_max_payload);
   RUN_TEST(test_packet_encode_payload_containing_sof);
   RUN_TEST(test_packet_encode_sequence_zero);
   RUN_TEST(test_packet_encode_sequence_255);
-  RUN_TEST(test_packet_decode);
+  RUN_TEST(test_packet_encode_type_zero);
+  RUN_TEST(test_packet_encode_type_255);
+  RUN_TEST(test_packet_encode_maximum_payload);
+
+  RUN_TEST(test_packet_decode_known_packet);
+  RUN_TEST(test_packet_decode_zero_length_payload);
+
+  RUN_TEST(test_packet_validate_accepts_valid_packet);
+  RUN_TEST(test_packet_validate_rejects_corrupted_payload);
+  RUN_TEST(test_packet_validate_rejects_corrupted_sequence);
+  RUN_TEST(test_packet_validate_rejects_corrupted_type);
+  RUN_TEST(test_packet_validate_rejects_corrupted_crc);
 
   return UNITY_END();
 }
